@@ -1,0 +1,63 @@
+services:
+  llm-exporter:
+    image: ghcr.io/strategic-zone/llm-exporter:latest
+    # build: .   # uncomment to build locally
+    container_name: llm-exporter
+    restart: unless-stopped
+    ports:
+      - "${METRICS_PORT:-9090}:9090"
+    environment:
+      - METRICS_PORT=${METRICS_PORT:-9090}
+      - SCRAPE_INTERVAL=${SCRAPE_INTERVAL:-300}
+      - CONFIG_FILE=/app/config.yaml
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_KEY=${SUPABASE_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    networks:
+      - monitoring
+
+  # Optional: VictoriaMetrics (lightweight Prometheus-compatible TSDB)
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    restart: unless-stopped
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+      - ./victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
+    command:
+      - "--promscrape.config=/etc/victoriametrics/scrape.yml"
+      - "--retentionPeriod=90d"
+    networks:
+      - monitoring
+    profiles:
+      - full  # only starts with: docker compose --profile full up
+
+  # Optional: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitoring
+    profiles:
+      - full
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  vm-data:
+  grafana-data:

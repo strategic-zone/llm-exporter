@@ -1,0 +1,69 @@
+# llm-exporter — Config example
+# Copy to config.yaml and fill in your keys
+# Note: Supabase credentials take priority over this file if SUPABASE_URL is set
+
+scrape_interval: 300   # seconds between each full probe cycle
+metrics_port: 9090
+
+providers:
+
+  - name: anthropic
+    probe: post_chat
+    base_url: https://api.anthropic.com
+    probe_model: claude-haiku-4-5-20251001   # cheapest model
+    keys:
+      - id: max-1
+        key: sk-ant-xxx
+        subscription: max       # max | pro | team | api (label only)
+      # - id: max-2
+      #   key: sk-ant-yyy
+      #   subscription: max
+
+  - name: openai
+    probe: post_chat
+    base_url: https://api.openai.com/v1
+    probe_model: gpt-4o-mini
+    keys:
+      - id: main
+        key: sk-proj-xxx
+
+  - name: openrouter
+    probe: auth_key             # free probe — no token cost
+    base_url: https://openrouter.ai/api/v1
+    keys:
+      - id: main
+        key: sk-or-v1-xxx
+
+  - name: xai
+    probe: post_chat
+    base_url: https://api.x.ai/v1
+    probe_model: grok-3-mini
+    keys:
+      - id: main
+        key: xai-xxx
+
+  - name: mistral
+    probe: post_chat
+    base_url: https://api.mistral.ai/v1
+    probe_model: mistral-small-latest
+    keys:
+      - id: main
+        key: xxx
+
+  - name: gemini
+    probe: post_generate        # Gemini-specific endpoint
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    probe_model: gemini-2.5-flash
+    probe_model_fallbacks:
+      - gemini-1.5-flash
+      - gemini-2.5-flash-lite
+    keys:
+      - id: main
+        key: AIzaSy-xxx
+
+  - name: elevenlabs
+    probe: user_endpoint        # free probe — GET /v1/user
+    base_url: https://api.elevenlabs.io
+    keys:
+      - id: main
+        key: sk_xxx
