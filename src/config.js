@@ -3,7 +3,8 @@
  * Supabase takes priority over YAML keys
  */
 import { readFileSync } from 'node:fs';
-import { load as yamlLoad } from 'js-yaml';
+import yamlPkg from 'js-yaml';
+const { load: yamlLoad } = yamlPkg;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
