@@ -12,6 +12,7 @@ export const g = {
   tokRemaining:      reg.gauge('llm_rate_limit_tokens_remaining',   'Remaining tokens in current window'),
   tokLimit:          reg.gauge('llm_rate_limit_tokens_limit',       'Total token limit per window'),
   resetTs:           reg.gauge('llm_rate_limit_reset_timestamp',    'Unix timestamp of next rate limit reset'),
+  probeCostUsd:      reg.gauge('llm_probe_cost_usd',                'Cost of last probe in USD (OAuth tokens only)'),
   creditsRemaining:  reg.gauge('llm_credits_remaining',             'Remaining credits in USD (OpenRouter)'),
   creditsTotal:      reg.gauge('llm_credits_total',                 'Total purchased credits in USD'),
   usageDaily:        reg.gauge('llm_usage_daily_usd',               'Daily usage in USD'),

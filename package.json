@@ -9,6 +9,8 @@
     "dev": "node --watch src/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.91",
+    "@anthropic-ai/sdk": "^0.82.0",
     "js-yaml": "^4.1.0"
   },
   "engines": {
