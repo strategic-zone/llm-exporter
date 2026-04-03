@@ -1,0 +1,160 @@
+name: Docker Build & Publish
+
+on:
+  # On release tag push (e.g. v1.0.0)
+  push:
+    tags:
+      - 'v*.*.*'
+
+  # Weekly rebuild every Monday at 03:00 UTC (base image updates, security patches)
+  schedule:
+    - cron: '0 3 * * 1'
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual rebuild'
+        required: false
+        default: 'manual rebuild'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # strategic-zone/llm-exporter
+
+jobs:
+  build-and-push:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      tags:   ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # On tag push → v1.2.3, v1.2, v1, latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            # On schedule/manual → dated rebuild of latest
+            type=raw,value=latest,enable=${{ github.event_name != 'push' }}
+            type=raw,value=weekly-${{ github.run_number }},enable=${{ github.event_name == 'schedule' }}
+          labels: |
+            org.opencontainers.image.title=llm-exporter
+            org.opencontainers.image.description=Prometheus exporter for LLM provider rate limits and usage
+            org.opencontainers.image.vendor=Strategic Zone
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          echo "### Docker image published 🐳" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  # ─── Cleanup: keep only last 5 versions ──────────────────────────────────────
+  cleanup:
+    name: Cleanup old images
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    permissions:
+      packages: write
+
+    steps:
+      - name: Delete old package versions (keep last 5)
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name:      llm-exporter
+          package-type:      container
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: false
+          ignore-versions:   '^(latest|v\d+\.\d+\.\d+)$'
+
+  # ─── Create GitHub Release on tag push ───────────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog from commits
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges | head -20)
+          fi
+          echo "COMMITS<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.COMMITS }}
+
+            ## Docker
+
+            ```bash
+            docker pull ghcr.io/strategic-zone/llm-exporter:${{ github.ref_name }}
+            ```
+
+            ```yaml
+            # compose.yml
+            image: ghcr.io/strategic-zone/llm-exporter:${{ github.ref_name }}
+            ```
+
+            **Digest:** `${{ needs.build-and-push.outputs.digest }}`
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}   # v1.0.0-rc1 → prerelease
