@@ -138,11 +138,31 @@ export async function resolveConfig() {
   }
 
   // Also load inline env vars: LLM_{PROVIDER}_{KEY_ID}=value
+  // Provider can contain underscores (e.g. LLM_AI_AZONE_MAIN → provider=ai-azone, key_id=main)
+  const KNOWN_PROVIDER_NAMES = new Set([
+    'anthropic','openai','openrouter','xai','mistral','gemini','google',
+    'elevenlabs','deepgram','ai_azone','modal','brave',
+  ]);
   for (const [envKey, envVal] of Object.entries(process.env)) {
-    const m = envKey.match(/^LLM_([A-Z]+)_(.+)$/);
-    if (!m || !envVal) continue;
-    const name = m[1].toLowerCase();
-    const key_id = m[2].toLowerCase();
+    if (!envKey.startsWith('LLM_') || !envVal) continue;
+    const rest = envKey.slice(4); // strip LLM_
+    const parts = rest.split('_');
+    // Find longest prefix that matches a known provider
+    let name = null, key_id = null;
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const candidate = parts.slice(0, i).join('_').toLowerCase();
+      if (KNOWN_PROVIDER_NAMES.has(candidate)) {
+        name = candidate.replace(/_/g, '-');  // ai_azone → ai-azone
+        key_id = parts.slice(i).join('_').toLowerCase();
+        break;
+      }
+    }
+    // Fallback: last part = key_id, rest = provider
+    if (!name) {
+      name = parts.slice(0, -1).join('_').toLowerCase().replace(/_/g, '-');
+      key_id = parts[parts.length - 1].toLowerCase();
+    }
+    if (!name || !key_id) continue;
     const defaults = PROVIDER_DEFAULTS[name] || {};
 
     if (!providers.has(name)) {
