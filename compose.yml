@@ -3,6 +3,7 @@ services:
     image: ghcr.io/strategic-zone/llm-exporter:latest
     # build: .   # uncomment to build locally
     container_name: llm-exporter
+    hostname: llm-exporter
     restart: unless-stopped
     ports:
       - "${METRICS_PORT:-9090}:9090"
@@ -14,7 +15,9 @@ services:
       - SUPABASE_KEY=${SUPABASE_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - config:/app/config.yaml
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - monitoring
 
@@ -22,15 +25,18 @@ services:
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
     container_name: victoriametrics
+    hostname: victoriametrics
     restart: unless-stopped
     ports:
       - "8428:8428"
     volumes:
       - vm-data:/victoria-metrics-data
-      - ./victoriametrics.yml:/etc/victoriametrics/scrape.yml:ro
+      - vm-config:/etc/victoriametrics/scrape.yml
     command:
       - "--promscrape.config=/etc/victoriametrics/scrape.yml"
       - "--retentionPeriod=90d"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - monitoring
     profiles:
@@ -40,6 +46,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    hostname: grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -48,7 +55,9 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-provisioning:/etc/grafana/provisioning
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - monitoring
     profiles:
@@ -59,5 +68,33 @@ networks:
     driver: bridge
 
 volumes:
+  config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/config.yaml
   vm-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-/opt/llm-exporter}/victoriametrics
+  vm-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/victoriametrics.yml
   grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_DIR:-/opt/llm-exporter}/grafana
+  grafana-provisioning:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/grafana/provisioning

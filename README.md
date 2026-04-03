@@ -16,9 +16,35 @@ Monitors Anthropic, OpenAI, OpenRouter, XAI, Mistral, Gemini, and ElevenLabs —
 
 ```bash
 cp .env.example .env
-# Edit .env with your keys (or use Supabase)
+cp config.example.yaml config.yaml
+# Edit .env and config.yaml with your keys
+
+# Create data directories (for full profile)
+mkdir -p /opt/llm-exporter/victoriametrics /opt/llm-exporter/grafana
+
+# Exporter only
 docker compose up -d
+
+# Full stack (+ VictoriaMetrics + Grafana)
+docker compose --profile full up -d
+
 # Metrics available at http://localhost:9090/metrics
+```
+
+## Auto-Update (Watchtower)
+
+All containers include the `com.centurylinklabs.watchtower.enable=true` label.
+If you run [Watchtower](https://containrrr.dev/watchtower/) on the same host, it will auto-update them:
+
+```bash
+docker run -d \
+  --name watchtower \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  containrrr/watchtower \
+  --label-enable \
+  --cleanup \
+  --schedule "0 0 4 * * 1"   # every Monday at 04:00
 ```
 
 ## Metrics
