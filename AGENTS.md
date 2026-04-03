@@ -254,3 +254,65 @@ For 10 keys across all providers: **~$0.15/day** ($4.50/month)
 ---
 
 *Strategic Zone / Atlantic Zone — internal tooling*
+
+---
+
+## Key Sources — Décision d'architecture
+
+**Source unique des clés : `config.yaml`**
+Les clés API sont déclarées dans `config.yaml` uniquement.
+Le `.env` ne contient jamais de clés — uniquement la config runtime.
+
+```
+.env          → METRICS_PORT, SCRAPE_INTERVAL, DATA_DIR, LOG_LEVEL
+config.yaml   → providers + keys (source of truth)
+Supabase      → optionnel, désactivé par défaut
+```
+
+### Activer Supabase comme source de clés
+
+Quand Supabase est activé, il **complète** les clés de `config.yaml` (ou les remplace si même key_id).
+
+**1. Décommenter dans `.env` :**
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=sb_secret_your_service_role_key_here
+```
+
+**2. Redémarrer le container :**
+```bash
+docker compose restart llm-exporter
+```
+
+**3. Vérifier dans les logs :**
+```bash
+docker logs llm-exporter | grep "supabase\|provider"
+# Doit afficher les providers avec les clés Supabase chargées
+```
+
+### Désactiver Supabase
+
+**1. Vider les variables dans `.env` :**
+```env
+SUPABASE_URL=
+SUPABASE_KEY=
+```
+
+**2. Redémarrer :**
+```bash
+docker compose restart llm-exporter
+```
+
+→ L'exporter retombe automatiquement sur `config.yaml` seul.
+
+### Mapping Supabase → providers
+
+La table `credentials` est lue avec ce filtre :
+```sql
+SELECT * FROM credentials
+WHERE active = true
+  AND provider IN ('anthropic','openai','openrouter','xai','mistral','google','gemini','elevenlabs')
+ORDER BY provider, scope;
+```
+
+Le `key_id` Prometheus est généré : `{scope}-{id[0:8]}` (ex: `global-e01b8860`)

@@ -15,7 +15,7 @@ services:
       - SUPABASE_KEY=${SUPABASE_KEY:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      - config:/app/config.yaml
+      - llm_exporter_config:/app/config.yaml
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
@@ -30,8 +30,8 @@ services:
     ports:
       - "8428:8428"
     volumes:
-      - vm-data:/victoria-metrics-data
-      - vm-config:/etc/victoriametrics/scrape.yml
+      - llm_exporter_vm_data:/victoria-metrics-data
+      - llm_exporter_vm_config:/etc/victoriametrics/scrape.yml
     command:
       - "--promscrape.config=/etc/victoriametrics/scrape.yml"
       - "--retentionPeriod=90d"
@@ -54,8 +54,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - grafana-data:/var/lib/grafana
-      - grafana-provisioning:/etc/grafana/provisioning
+      - llm_exporter_grafana_data:/var/lib/grafana
+      - llm_exporter_grafana_provisioning:/etc/grafana/provisioning
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
@@ -68,33 +68,33 @@ networks:
     driver: bridge
 
 volumes:
-  config:
+  llm_exporter_config:
     driver: local
     driver_opts:
       type: none
+      device: ${DATA_DIR:-/opt/llm-exporter}/config.yaml
       o: bind
-      device: ${PWD}/config.yaml
-  vm-data:
+  llm_exporter_vm_data:
     driver: local
     driver_opts:
       type: none
-      o: bind
       device: ${DATA_DIR:-/opt/llm-exporter}/victoriametrics
-  vm-config:
+      o: bind
+  llm_exporter_vm_config:
     driver: local
     driver_opts:
       type: none
+      device: ${DATA_DIR:-/opt/llm-exporter}/victoriametrics.yml
       o: bind
-      device: ${PWD}/victoriametrics.yml
-  grafana-data:
+  llm_exporter_grafana_data:
     driver: local
     driver_opts:
       type: none
-      o: bind
       device: ${DATA_DIR:-/opt/llm-exporter}/grafana
-  grafana-provisioning:
+      o: bind
+  llm_exporter_grafana_provisioning:
     driver: local
     driver_opts:
       type: none
+      device: ${DATA_DIR:-/opt/llm-exporter}/grafana-provisioning
       o: bind
-      device: ${PWD}/grafana/provisioning
